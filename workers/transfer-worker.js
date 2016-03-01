@@ -10,7 +10,7 @@ var params = {
 
 var conString = "postgres://postgres:@localhost:9999/postgres";
 AWS.config.update({
-  region: 'us-east-1'
+  region: 'us-east-1',
 });
 
 var docClient = new AWS.DynamoDB.DocumentClient();
@@ -71,7 +71,7 @@ function putItem(params,retry){
   docClient.put(params, function(err, data) {
     if (err) {
       console.error(" Unable to add row Error JSON:", JSON.stringify(err, null, 2));
-      if (err.statusCode == 400){
+      if (err.statusCode == 400 || err.retryable == "true"){
         if(retry < 3){
           console.log("retrying");
           setTimeout(putItem,100,[params,retry]);
