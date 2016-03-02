@@ -8,11 +8,13 @@ var params = {
   WaitTimeSeconds : 10
 }
 
+var putcount = 0;
+var rowcount = 0;
 var conString = "postgres://postgres:@localhost:9999/postgres";
 AWS.config.update({
   region: 'us-east-1',
 });
-
+var rh = null;
 var docClient = new AWS.DynamoDB.DocumentClient();
 
 function readMessage(){
@@ -22,6 +24,8 @@ function readMessage(){
     else{   
       //console.log(data);           // successful response
       if(data['Messages']){
+        rowcount  =0;
+         putcount = 0;
         rh = data['Messages'][0]['ReceiptHandle'];
         pg.connect(conString, function(err, client, done) {
           if(err) {
@@ -32,6 +36,7 @@ function readMessage(){
                 console.log(err);
               }else{
                 rows = result.rows;
+                rowcount = rows.length;
                 for(var i = 0; i < rows.length; i++){
                   var params = {
                     TableName:"employees",
@@ -45,7 +50,7 @@ function readMessage(){
                   putItem(params);  
                   if( i === rows.length - 1 ){
                     client.query('delete from emp', function (err){
-                      deleteMessage(rh);
+                      waitforme();
                     });
                     done();
                   }
@@ -75,17 +80,36 @@ function putItem(params,retry){
         if(retry < 3){
           console.log("retrying");
           setTimeout(putItem,100,[params,retry]);
-        }
+        }else{
+	   rowcount--;
+         }
       }
+      
+     
+    }else{
+
+      putcount++;
     } 
   });
 }
 
-function deleteMessage(rh){
+function waitforme(){
+  if(putcount == rowcount){
+    deleteMessage();	
+  }else{
+    console.log(rowcount,putcount);
+    setTimeout(waitforme,100);
+
+  }
+
+
+}
+
+function deleteMessage(){
   sqs.deleteMessage( { QueueUrl : queue, ReceiptHandle: rh }, function(err,data){
     if(err){
       console.log(err);
-      deleteMessage(rh);
+      deleteMessage();
     }else{
       readMessage();
     }
